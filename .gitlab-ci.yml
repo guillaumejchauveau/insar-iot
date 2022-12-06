@@ -2,40 +2,15 @@ variables:
   TEST_DISABLED: "true"
   CODE_QUALITY_DISABLED: "true"
 
-stages:
-  - build
-
-#include:
-#  - template: Auto-DevOps.gitlab-ci.yml
-
-.build-image:
-  image: registry.gitlab.com/ericvh/docker-buildx-qemu
-  stage: build
-  # services:
-  #   - name: docker:dind
-  #     entrypoint: ["env", "-u", "DOCKER_HOST"]
-  #     command: ["dockerd-entrypoint.sh"]
-  variables:
-    #DOCKER_HOST: tcp://docker:2375/
-    DOCKER_DRIVER: overlay2
-    # See https://github.com/docker-library/docker/pull/166
-    DOCKER_TLS_CERTDIR: ""
-  before_script:
-    - |
-      if [[ -z "$CI_COMMIT_TAG" ]]; then
-        export CI_APPLICATION_REPOSITORY=${CI_APPLICATION_REPOSITORY:-$CI_REGISTRY_IMAGE/$CI_COMMIT_REF_SLUG}
-        export CI_APPLICATION_TAG=${CI_APPLICATION_TAG:-$CI_COMMIT_SHA}
-      else
-        export CI_APPLICATION_REPOSITORY=${CI_APPLICATION_REPOSITORY:-$CI_REGISTRY_IMAGE}
-        export CI_APPLICATION_TAG=${CI_APPLICATION_TAG:-$CI_COMMIT_TAG}
-      fi
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+include:
+  - template: Auto-DevOps.gitlab-ci.yml
+  - .gitlab/common.yml
 
 build:
-  extends: .build-image
-  script:
+  extends: .build_job
+  image: registry.gitlab.com/ericvh/docker-buildx-qemu
+  before_script:
     - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
-    - docker buildx create --driver docker-container --use
-    - docker buildx inspect --bootstrap
-    - docker buildx ls
-    - docker buildx build --platform "linux/amd64,linux/arm64" --progress plain --pull -t "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" --push .
+    # - docker buildx create --driver docker-container --use
+    # - docker buildx inspect --bootstrap
+    # - docker buildx ls
