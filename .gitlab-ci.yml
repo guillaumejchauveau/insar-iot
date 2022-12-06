@@ -11,16 +11,15 @@ stages:
 .build-image:
   image: registry.gitlab.com/ericvh/docker-buildx-qemu
   stage: build
-  services:
-    - name: docker:dind
-      entrypoint: ["env", "-u", "DOCKER_HOST"]
-      command: ["dockerd-entrypoint.sh"]
+  # services:
+  #   - name: docker:dind
+  #     entrypoint: ["env", "-u", "DOCKER_HOST"]
+  #     command: ["dockerd-entrypoint.sh"]
   variables:
-    DOCKER_HOST: tcp://docker:2375/
+    #DOCKER_HOST: tcp://docker:2375/
     DOCKER_DRIVER: overlay2
     # See https://github.com/docker-library/docker/pull/166
     DOCKER_TLS_CERTDIR: ""
-  retry: 2
   before_script:
     - |
       if [[ -z "$CI_COMMIT_TAG" ]]; then
