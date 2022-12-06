@@ -22,6 +22,9 @@
     # Log into the GitLab Registry and Dependency Proxy.
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - echo "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin "$CI_DEPENDENCY_PROXY_SERVER"
+    # Ensure execution of other binary formats is enabled in the kernel
+    - update-binfmts --enable
+    - docker buildx create --driver docker-container --use
     # Build and push the image.
     - |
       docker buildx build \
