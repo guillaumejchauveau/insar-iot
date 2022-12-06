@@ -3,9 +3,9 @@ stages:
 
 include:
   - local: .gitlab/common.yml
-  - template: Jobs/SAST.gitlab-ci.yml
-  - template: Jobs/Container-Scanning.gitlab-ci.yml
-  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  # - template: Jobs/SAST.gitlab-ci.yml
+  # - template: Jobs/Container-Scanning.gitlab-ci.yml
+  # - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 build:
   extends: .build_job
