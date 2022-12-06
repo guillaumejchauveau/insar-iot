@@ -9,6 +9,5 @@ include:
 
 build:
   extends: .build_job
-  image: registry.gitlab.com/ericvh/docker-buildx-qemu
   variables:
     IMAGE_PLATFORM: "linux/amd64,linux/arm64"
