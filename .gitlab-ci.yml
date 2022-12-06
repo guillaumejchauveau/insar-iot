@@ -2,9 +2,11 @@ variables:
   TEST_DISABLED: "true"
   CODE_QUALITY_DISABLED: "true"
 
+stages:
+  - build
 include:
-  - template: Auto-DevOps.gitlab-ci.yml
-  - .gitlab/common.yml
+  #- template: Auto-DevOps.gitlab-ci.yml
+  - local: .gitlab/common.yml
 
 build:
   extends: .build_job
