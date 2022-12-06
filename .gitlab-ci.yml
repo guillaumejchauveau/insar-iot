@@ -2,10 +2,13 @@ variables:
   TEST_DISABLED: "true"
   CODE_QUALITY_DISABLED: "true"
 
-include:
-  - template: Auto-DevOps.gitlab-ci.yml
+stages:
+  - build
 
-.build:
+#include:
+#  - template: Auto-DevOps.gitlab-ci.yml
+
+.build-image:
   image: registry.gitlab.com/ericvh/docker-buildx-qemu
   stage: build
   services:
@@ -30,7 +33,7 @@ include:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
 
 build:
-  extends: .build
+  extends: .build-image
   script:
     - update-binfmts --enable # Important: Ensures execution of other binary formats is enabled in the kernel
     - docker buildx create --driver docker-container --use
