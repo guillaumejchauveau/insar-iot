@@ -1,5 +1,6 @@
 variables:
   TEST_DISABLED: "true"
+  CODE_QUALITY_DISABLED: "true"
 
 include:
   - template: Auto-DevOps.gitlab-ci.yml
