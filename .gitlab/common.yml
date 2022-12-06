@@ -15,6 +15,8 @@
 .build_job:
   stage: build
   image: registry.gitlab.com/gitlab-org/cluster-integration/auto-build-image:v1.19.0
+  variables:
+    IMAGE_PLATFORM: "linux/amd64"
   script:
     - *image_vars_script
     # Log into the GitLab Registry and Dependency Proxy.
