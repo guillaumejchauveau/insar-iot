@@ -73,12 +73,6 @@ class Elessar:
         signal.signal(signal.SIGINT, lambda s, f: self.stop())
         await asyncio.gather(self.__scanner.start(), self.__switch_timer.start())
 
-    def scan_callback(self, device, advertising_data):
-        for filter in self.filters:
-            if filter.filter(device, advertising_data):
-                self.callback()
-                return
-
     def stop(self):
         self.__scanner.stop()
         self.__switch_timer.stop()
