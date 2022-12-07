@@ -4,75 +4,97 @@ import signal
 import phue
 
 class LightManager:
-    def __init__(self, timeout, bridge_ip):
+    def __init__(self):
         self.stop_event = asyncio.Event()
         self.counter = 0
-        self.previous_state = False
-        self.timeout = timeout
-        self.bridge = phue.Bridge(bridge_ip)
-        self.lights = phue.AllLights(self.bridge)
+
+        self.timeout = None
+        self.groups = []
 
     def turn_on(self):
-        self.lights.on = True
-        print("light on")
+        print("Turning on")
+        for group in self.groups:
+            group.on = True
 
     def turn_off(self):
-        self.lights.on = False
-        print("light off")
+        print("Turning off")
+        for group in self.groups:
+            group.on = False
 
     def reset(self):
         self.counter = self.timeout
 
     async def start(self):
         while not self.stop_event.is_set():
-            if self.counter > 0:
-                self.counter -= 1
-                if not self.previous_state:
+            if self.timeout:
+                if self.counter > 0:
+                    self.counter -= 1
                     self.turn_on()
-                    self.previous_state = True
-            elif self.previous_state:
-                self.turn_off()
-                self.previous_state = False
+                else:
+                    self.turn_off()
+
             await asyncio.sleep(1)
 
     def stop(self):
         self.stop_event.set()
 
-class IBeaconScanner:
+class IBeaconFilter:
     APPLE_CID = 76
 
-    def __init__(self, callback, uuids):
-        self.stop_event = asyncio.Event()
-        self.scanner = bleak.BleakScanner(self.scan_callback)
-        self.callback = callback
-        self.uuids = uuids
+    def __init__(self):
+        self.uuids = []
 
-    def scan_callback(self, device, advertising_data):
+    def filter(self, device, advertising_data):
         if self.APPLE_CID in advertising_data.manufacturer_data:
             if advertising_data.manufacturer_data[self.APPLE_CID][2:18] in self.uuids:
-                self.callback(device, advertising_data)
+                return True
+        return False
+
+class Scanner:
+    def __init__(self, callback):
+        self.stop_event = asyncio.Event()
+        self.scanner = bleak.BleakScanner(self.scan_callback)
+        self.filters = []
+        self.callback = callback
+
+    def add_filter(self, filter):
+        if filter not in self.filters:
+            self.filters.append(filter)
 
     async def start(self):
         await self.scanner.start()
         await self.stop_event.wait()
         await self.scanner.stop()
 
+    def scan_callback(self, device, advertising_data):
+        for filter in self.filters:
+            if filter.filter(device, advertising_data):
+                self.callback()
+                return
+
     def stop(self):
         self.stop_event.set()
 
-def SIGINT_handler(scanner, light_manager):
-    scanner.stop()
-    light_manager.stop()
 
-async def main():
-    light_manager = LightManager(timeout=3, bridge_ip="192.168.2.20")
-    scanner = IBeaconScanner(lambda device, data: light_manager.reset(), uuids=[
-        b"\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee"
-    ])
+class Elessar:
+    def __init__(self):
+        self.light_manager = LightManager()
+        self.light_manager.timeout = 3
+        self.light_manager.groups = []#[phue.Group(phue.Bridge("192.168.2.20"), 0)]
+        self.scanner = Scanner(self.light_manager.reset)
+        self.ibeacon_filter = IBeaconFilter()
+        self.ibeacon_filter.uuids = [
+            b"\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee"
+        ]
+        self.scanner.add_filter(self.ibeacon_filter)
 
-    signal.signal(signal.SIGINT, lambda s, f: SIGINT_handler(scanner, light_manager))
+    async def run(self):
+        signal.signal(signal.SIGINT, lambda s, f: self.stop())
+        await asyncio.gather(self.scanner.start(), self.light_manager.start())
 
-    await asyncio.gather(scanner.start(), light_manager.start())
+    def stop(self):
+        self.scanner.stop()
+        self.light_manager.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(Elessar().run())
