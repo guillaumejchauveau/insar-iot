@@ -60,11 +60,11 @@ class Elessar:
         self.__hue_bridge_manager.bridges[0].group_ids.append(1)
 
     def on(self):
-        print("on")
+        print("Elessar.on")
         self.__hue_bridge_manager.set_bridges_groups_state(True)
 
     def off(self):
-        print("off")
+        print("Elessar.off")
         self.__hue_bridge_manager.set_bridges_groups_state(False)
 
     async def run(self):
@@ -72,6 +72,12 @@ class Elessar:
 
         signal.signal(signal.SIGINT, lambda s, f: self.stop())
         await asyncio.gather(self.__scanner.start(), self.__switch_timer.start())
+
+    def scan_callback(self, device, advertising_data):
+        for filter in self.filters:
+            if filter.filter(device, advertising_data):
+                self.callback()
+                return
 
     def stop(self):
         self.__scanner.stop()

@@ -52,6 +52,12 @@ class Bridge:
     def ip(self, ip: str):
         self.__ip = ip
         self.__bridge = None
+        try:
+            self.__bridge = phue.Bridge(self.ip)
+        except phue.PhueRegistrationException as e:
+            raise Exception(e)
+        except:
+            raise Exception("unknown error")
 
     @property
     def name(self) -> str:
@@ -59,7 +65,7 @@ class Bridge:
             try:
                 self.__name = Bridge.get_friendly_name(self.ip)
             except Exception as e:
-                print(e)
+                print("hue.Bridge.name", e)
                 self.__name = self.serial_number + " (" + self.ip + ")"
 
         return self.__name
@@ -77,13 +83,6 @@ class Bridge:
             raise Exception("Bridge not found")
 
         self.__name = None
-
-        try:
-            self.__bridge = phue.Bridge(self.ip)
-        except phue.PhueRegistrationException as e:
-            raise Exception(e)
-        except:
-            raise Exception("unknown error")
 
     @property
     def available_groups(self) -> dict[int, str]:
@@ -126,9 +125,9 @@ class BridgeManager:
                 self.__available_bridges.append(available)
 
                 if serial_number in self.__bridges:
-                    self.__bridges[serial_number].ip = ip
+                    self.__bridges[serial_number].ip = available.ip
         except Exception as e:
-            print(e)
+            print("hue.BridgeManager.reload", e)
 
     def add_bridge(self, bridge: Bridge):
         bridge.reload()
@@ -145,4 +144,4 @@ class BridgeManager:
             try:
                 bridge.set_groups_state(value)
             except Exception as e:
-                print(e)
+                print("hue.BridgeManager.set_bridges_groups_state", e)
