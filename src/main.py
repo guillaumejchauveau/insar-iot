@@ -1,19 +1,23 @@
 import asyncio
 import bleak
 import signal
-
+import phue
 
 class LightManager:
-    def __init__(self, timeout):
+    def __init__(self, timeout, bridge_ip):
         self.stop_event = asyncio.Event()
         self.counter = 0
         self.previous_state = False
         self.timeout = timeout
+        self.bridge = phue.Bridge(bridge_ip)
+        self.lights = phue.AllLights(self.bridge)
 
     def turn_on(self):
+        self.lights.on = True
         print("light on")
 
     def turn_off(self):
+        self.lights.on = False
         print("light off")
 
     def reset(self):
@@ -61,7 +65,7 @@ def SIGINT_handler(scanner, light_manager):
     light_manager.stop()
 
 async def main():
-    light_manager = LightManager(timeout=3)
+    light_manager = LightManager(timeout=3, bridge_ip="192.168.2.20")
     scanner = IBeaconScanner(lambda device, data: light_manager.reset(), uuids=[
         b"\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee\xee"
     ])
