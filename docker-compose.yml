@@ -1,0 +1,13 @@
+version: "2"
+
+services:
+  elessar:
+    build: .
+    restart: on-failure
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    labels:
+      io.balena.features.dbus: '1'
+    #volumes:
+    #  - /run/dbus:/host/run/dbus
