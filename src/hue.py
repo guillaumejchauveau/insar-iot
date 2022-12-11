@@ -1,147 +1,200 @@
-import discoverhue
-import re
-import urllib.request
-import xml.etree.ElementTree as ET
-import phue
+import asyncio
+import ipaddress
+from typing import Optional
+
+import requests
+import zeroconf as zc
+import zeroconf.asyncio as azc
 
 
-def _extract_ip_from_url(url: str) -> str:
-    if not url:
-        return None
+class BridgeApi:
+    ip: Optional[str]
+    username: Optional[str]
 
-    result = re.search(r'//([^/:]+)', url)
-    if result:
-        return result.group(1)
+    def __init__(self, ip: str = None, username: str = None):
+        self.ip = ip
+        self.username = username
 
-    return None
+    def request(self, method: str, endpoint: str, endpoint_args: list[str] = None, public: bool = False, data=None):
+        if endpoint_args is None:
+            endpoint_args = []
+        if not self.ip:
+            raise Exception("API needs IP address")
+        if not public and not self.username:
+            raise Exception("Private endpoint needs username")
+
+        response = requests.request(method, timeout=(1, 0.5), json=data, url="http://{}/api{}{}".format(
+            self.ip,
+            '' if public else '/' + self.username,
+            endpoint.format(*endpoint_args)
+        ))
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, list):
+            for message in data:
+                if "error" in message:
+                    if message["error"]["type"] == 101:
+                        raise Exception("Button not pressed")
+        return data
+
+    def get_public_config(self) -> dict[str, any]:
+        return self.request("GET", "/config", public=True)
+
+    def get_config(self) -> dict[str, any]:
+        return self.request("GET", "/config")
+
+    def register_app(self) -> list[dict[str, any]]:
+        return self.request("POST", "", public=True, data={"devicetype": "elessar"})
+
+    def get_groups(self) -> dict[str, dict[str, any]]:
+        return self.request("GET", "/groups")
+
+    def set_group_on(self, group_id: str, value: bool) -> list[dict[str, any]]:
+        return self.request("PUT", "/groups/{}/action", [group_id], data={"on": value})
 
 
 class Bridge:
-    @staticmethod
-    def get_friendly_name(ip: str) -> str:
-        req = urllib.request.Request("http://" + ip + "/description.xml")
-        with urllib.request.urlopen(req) as response:
-            xml_description = response.read().decode()
-            root = ET.fromstring(xml_description)
-            rootname = {'root': root.tag[root.tag.find('{')+1:root.tag.find('}')]}
-            device = root.find('root:device', rootname)
-            return device.find('root:friendlyName', rootname).text
+    __id: str
+    __name: Optional[str]
+    __api: BridgeApi
 
-    __serial_number: str
-    __ip: str
-    __name: str
-    __bridge: phue.Bridge
-    group_ids: list[int]
+    group_ids: set[str]
 
-    def __init__(self, serial_number: str):
-        self.__serial_number = serial_number
-        self.__ip = None
+    def __init__(self, bridge_id: str, username: str = None):
+        self.__id = bridge_id
         self.__name = None
-        self.__bridge = None
-        self.group_ids = []
+        self.group_ids = set()
 
-    @property
-    def serial_number(self) -> str:
-        return self.__serial_number
+        self.__api = BridgeApi(username=username)
 
-    @property
-    def ip(self) -> str:
-        return self.__ip
+    def __clean_groups(self):
+        self.group_ids = self.group_ids.intersection(self.available_groups.keys())
 
-    @ip.setter
-    def ip(self, ip: str):
-        self.__ip = ip
-        self.__bridge = None
+    def connect(self, ip: str = None, username: str = None):
+        if ip:
+            self.__api.ip = ip
+        if username:
+            self.__api.username = username
+
+        if not self.__api.ip:
+            raise Exception('ip required')
+
+        if not self.__api.username:
+            # Get API credentials
+            try:
+                self.__api.username = self.__api.register_app()[0]['success']['username']
+            except Exception as e:
+                print(e)
+                return
+
+        # Verify API credentials
         try:
-            self.__bridge = phue.Bridge(self.ip)
-        except phue.PhueRegistrationException as e:
-            raise Exception(e)
-        except:
-            raise Exception("unknown error")
+            self.__api.get_config()
+            # Credentials are valid
+        except Exception as e:
+            # Credentials are invalid
+            print(e)
+            self.__api.username = None
+
+    @property
+    def id(self) -> str:
+        return self.__id
 
     @property
     def name(self) -> str:
-        if not self.__name:
+        if self.__api.ip:
             try:
-                self.__name = Bridge.get_friendly_name(self.ip)
+                self.__name = self.__api.get_public_config()['name']
             except Exception as e:
-                print("hue.Bridge.name", e)
-                self.__name = self.serial_number + " (" + self.ip + ")"
+                print(e)
+                # self.__api.ip = None
 
         return self.__name
 
-    def reload(self):
-        discovered_url = None
-        if self.ip:
-            found = discoverhue.find_bridges({self.serial_number: self.ip})
-            discovered_url = found.get(self.serial_number, None)
-        else:
-            discovered_url = discoverhue.find_bridges(self.serial_number)
-
-        self.ip = _extract_ip_from_url(discovered_url)
-        if not self.ip:
-            raise Exception("Bridge not found")
-
-        self.__name = None
+    @property
+    def connected(self):
+        return self.__api.ip and self.__api.username
 
     @property
-    def available_groups(self) -> dict[int, str]:
-        if self.__bridge is None:
-            raise Exception("Bridge not connected")
+    def available_groups(self) -> dict[str, str]:
+        if not self.connected:
+            raise Exception('not connected')
+        return {group_id: group['name'] for group_id, group in self.__api.get_groups().items()}
 
-        return { group.group_id : group.name for group in self.__bridge.groups }
-
-    def set_groups_state(self, value: bool):
-        if self.__bridge is None:
-            raise Exception("Bridge not connected")
-
+    def set_groups_on(self, value: bool):
+        if not self.connected:
+            raise Exception('not connected')
+        self.__clean_groups()
         for group_id in self.group_ids:
-            phue.Group(self.__bridge, group_id).on = value
+            try:
+                self.__api.set_group_on(group_id, value)
+            except Exception as e:
+                print(e)
+
+    def __eq__(self, other):
+        return isinstance(other, Bridge) and other.id == self.id
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __getstate__(self):
+        return {
+            'id': self.__id,
+            'name': self.__name,
+            'group_ids': list(self.group_ids),
+            'username': self.__api.username
+        }
+
+    @classmethod
+    def __setstate__(cls, state):
+        bridge = cls(state['id'], state['username'])
+        bridge.__name = state['name']
+        bridge.group_ids = set(state['group_ids'])
+        return bridge
 
 
 class BridgeManager:
-    __bridges: dict[str, Bridge]
-    __available_bridges: list[Bridge]
+    __available_bridge_ips: dict[str, str]
+    __zeroconf: azc.AsyncZeroconf
+    __service_browser: Optional[azc.AsyncServiceBrowser]
+
+    bridges: dict[str, Bridge]
 
     def __init__(self):
-        self.__bridges = {}
-        self.__available_bridges = []
+        self.__available_bridge_ips = {}
+        self.__zeroconf = azc.AsyncZeroconf()
+        self.__service_browser = None
+
+        self.bridges = {}
+
+    def __handle_service_event(self, zeroconf: zc.Zeroconf, service_type: str, name: str,
+                               state_change: zc.ServiceStateChange) -> None:
+        asyncio.ensure_future(self.__async_handle_service_event(zeroconf, service_type, name, state_change))
+
+    async def __async_handle_service_event(self, zeroconf: zc.Zeroconf, service_type: str, name: str,
+                                           state_change: zc.ServiceStateChange) -> None:
+        info = azc.AsyncServiceInfo(service_type, name)
+        await info.async_request(zeroconf, 3000)
+        bridge_ip = str(ipaddress.ip_address(info.addresses[0]))
+        bridge_id = info.properties[b'bridgeid'].decode('utf-8')
+
+        if state_change is zc.ServiceStateChange.Removed:
+            del self.__available_bridge_ips[bridge_id]
+        else:
+            self.__available_bridge_ips[bridge_id] = bridge_ip
 
     @property
-    def bridges(self) -> list[Bridge]:
-        return list(self.__bridges.values())
+    def available_bridges(self) -> dict[str, str]:
+        return {bridge_id: BridgeApi(bridge_ip).get_public_config()['name'] for bridge_id, bridge_ip in
+                self.__available_bridge_ips.items()}
 
-    @property
-    def available_bridges(self) -> list[Bridge]:
-        return self.__available_bridges
+    def get_bridge_ip(self, bridge_id: str) -> str:
+        return self.__available_bridge_ips[bridge_id]
 
-    def reload(self):
-        self.__available_bridges = []
-        try:
-            for (serial_number, url) in discoverhue.find_bridges().items():
-                available = Bridge(serial_number)
-                available.ip = _extract_ip_from_url(url)
+    def start(self):
+        self.__service_browser = azc.AsyncServiceBrowser(self.__zeroconf.zeroconf, "_hue._tcp.local.",
+                                                         handlers=[self.__handle_service_event])
 
-                self.__available_bridges.append(available)
-
-                if serial_number in self.__bridges:
-                    self.__bridges[serial_number].ip = available.ip
-        except Exception as e:
-            print("hue.BridgeManager.reload", e)
-
-    def add_bridge(self, bridge: Bridge):
-        bridge.reload()
-        self.__bridges[bridge.serial_number] = bridge
-
-    def get_bridge(self, serial_number: str) -> Bridge:
-        return self.__bridges[serial_number]
-
-    def remove_bridge(self, serial_number: str):
-        del self.__bridges[serial_number]
-
-    def set_bridges_groups_state(self, value: bool):
-        for bridge in self.bridges:
-            try:
-                bridge.set_groups_state(value)
-            except Exception as e:
-                print("hue.BridgeManager.set_bridges_groups_state", e)
+    async def stop(self):
+        await self.__service_browser.async_cancel()
+        await self.__zeroconf.async_close()

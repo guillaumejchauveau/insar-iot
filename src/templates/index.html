@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Elessar</title>
+</head>
+<body>
+<form action="/timeout" method="post">
+    <fieldset>
+        <legend>Switch timer</legend>
+        <label for="switch_timer_timeout">Timeout: </label>
+        <input type="number" id="switch_timer_timeout" name="switch_timer_timeout" value="{{ switch_timer_timeout }}">
+        <br>
+        <input type="submit" value="Submit">
+    </fieldset>
+</form>
+
+<form action="/beacons" method="post">
+    <fieldset>
+        <legend>Beacons</legend>
+        <ul>
+        {% for beacon_id, beacon_name in beacons.items() %}
+            {% set beacon_field = 'beacon[' ~ beacon_id ~ ']' %}
+            <li>
+                <input type="checkbox" id="{{ beacon_field }}" name="beacon[]" value="{{ beacon_id }}" checked>
+                <label for="{{ beacon_field }}">{{ beacon_name }}</label>
+            </li>
+        {% endfor %}
+        {% for beacon_id, beacon_name in available_beacons.items() %}
+        {% if not beacon_id in beacons %}
+            {% set beacon_field = 'beacon[' ~ beacon_id ~ ']' %}
+            <li>
+                <input type="checkbox" id="{{ beacon_field }}" name="beacon[]" value="{{ beacon_id }}">
+                <label for="{{ beacon_field }}">{{ beacon_name }}</label>
+            </li>
+        {% endif %}
+        {% endfor %}
+        </ul>
+        <input type="submit" value="Submit">
+    </fieldset>
+</form>
+
+<form action="/bridges" method="post">
+    <fieldset>
+        <legend>Hue Bridges</legend>
+        <ul>
+        {% for bridge in bridges.values() %}
+            {% set bridge_field = 'bridge[' ~ bridge.id ~ ']' %}
+            <li>
+                <input type="checkbox" id="{{ bridge_field }}" name="bridge[]" value="{{ bridge.id }}" checked>
+                <label for="{{ bridge_field }}">
+                    {{ bridge.name }}
+                {% if bridge.connected %}
+                    connected
+                {% elif bridge.id in available_bridges %}
+                    available, try to press the link button
+                {% else %}
+                    disconnected
+                {% endif %}
+                </label>
+            {% if bridge.connected %}
+                <ul>
+                {% for group_id, group_name in bridge.available_groups.items() %}
+                    {% set group_field = 'group[' ~ bridge.id ~ '][' ~ group_id ~ ']' %}
+                    <li>
+                        <input type="checkbox" id="{{ group_field }}" name="group[{{ bridge.id }}][]" value="{{ group_id }}"
+                               {% if group_id in bridge.group_ids %}checked{% endif %}>
+                        <label for="{{ group_field }}">{{ group_name }}</label>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+            </li>
+        {% endfor %}
+
+        {% for bridge_id, bridge_name in available_bridges.items() %}
+        {% if not bridge_id in bridges %}
+            {% set bridge_field = 'bridge[' ~ bridge_id ~ ']' %}
+            <li>
+                <input type="checkbox" id="{{ bridge_field }}" name="bridge[]" value="{{ bridge_id }}">
+                <label for="{{ bridge_field }}">{{ bridge_name }} available</label>
+            </li>
+        {% endif %}
+        {% endfor %}
+        </ul>
+        <input type="submit" value="Submit">
+    </fieldset>
+</form>
+</body>
+</html>

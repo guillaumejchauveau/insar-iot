@@ -5,13 +5,14 @@ WORKDIR /usr/src/app
 RUN apt-get update
 RUN apt-get install -y bluez
 
-COPY .docker/entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
-ENTRYPOINT [ "entrypoint.sh" ]
+ENV DBUS_SYSTEM_BUS_ADDRESS unix:path=/host/run/dbus/system_bus_socket
 
 COPY src/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN mkdir /etc/elessar
+VOLUME /etc/elessar
+
 COPY src .
 
-CMD [ "python", "-u", "./main.py" ]
+CMD [ "python", "-u", "./prod.py", "/etc/elessar/config.json" ]
