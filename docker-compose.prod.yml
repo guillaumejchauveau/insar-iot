@@ -1,0 +1,22 @@
+version: '2'
+
+services:
+  elessar:
+    image: gitlab.insa-rennes.fr:5050/guillaumejchauveau/iot:latest
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    privileged: true # TODO: fix DBus permission error
+    volumes:
+      - /etc/elessar:/etc/elessar
+      - /run/dbus:/host/run/dbus
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    command: --label-enable

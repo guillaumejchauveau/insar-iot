@@ -23,7 +23,7 @@ class BridgeApi:
         if not public and not self.username:
             raise Exception("Private endpoint needs username")
 
-        response = requests.request(method, timeout=(1, 0.5), json=data, url="http://{}/api{}{}".format(
+        response = requests.request(method, timeout=(1, 0.5), json=data, url='http://{}/api{}{}'.format(
             self.ip,
             '' if public else '/' + self.username,
             endpoint.format(*endpoint_args)
@@ -32,25 +32,25 @@ class BridgeApi:
         data = response.json()
         if isinstance(data, list):
             for message in data:
-                if "error" in message:
-                    if message["error"]["type"] == 101:
+                if 'error' in message:
+                    if message['error']['type'] == 101:
                         raise Exception("Button not pressed")
         return data
 
     def get_public_config(self) -> dict[str, any]:
-        return self.request("GET", "/config", public=True)
+        return self.request('GET', '/config', public=True)
 
     def get_config(self) -> dict[str, any]:
-        return self.request("GET", "/config")
+        return self.request('GET', '/config')
 
     def register_app(self) -> list[dict[str, any]]:
-        return self.request("POST", "", public=True, data={"devicetype": "elessar"})
+        return self.request('POST', '', public=True, data={'devicetype': 'elessar'})
 
     def get_groups(self) -> dict[str, dict[str, any]]:
-        return self.request("GET", "/groups")
+        return self.request('GET', '/groups')
 
     def set_group_on(self, group_id: str, value: bool) -> list[dict[str, any]]:
-        return self.request("PUT", "/groups/{}/action", [group_id], data={"on": value})
+        return self.request('PUT', '/groups/{}/action', [group_id], data={'on': value})
 
 
 class Bridge:
@@ -84,8 +84,7 @@ class Bridge:
             try:
                 self.__api.username = self.__api.register_app()[0]['success']['username']
             except Exception as e:
-                print(e)
-                return
+                raise e
 
         # Verify API credentials
         try:
@@ -93,8 +92,8 @@ class Bridge:
             # Credentials are valid
         except Exception as e:
             # Credentials are invalid
-            print(e)
             self.__api.username = None
+            raise e
 
     @property
     def id(self) -> str:
@@ -118,18 +117,18 @@ class Bridge:
     @property
     def available_groups(self) -> dict[str, str]:
         if not self.connected:
-            raise Exception('not connected')
+            return {}
         return {group_id: group['name'] for group_id, group in self.__api.get_groups().items()}
 
     def set_groups_on(self, value: bool):
         if not self.connected:
-            raise Exception('not connected')
+            raise Exception("not connected")
         self.__clean_groups()
         for group_id in self.group_ids:
             try:
                 self.__api.set_group_on(group_id, value)
             except Exception as e:
-                print(e)
+                raise e
 
     def __eq__(self, other):
         return isinstance(other, Bridge) and other.id == self.id
@@ -192,7 +191,7 @@ class BridgeManager:
         return self.__available_bridge_ips[bridge_id]
 
     def start(self):
-        self.__service_browser = azc.AsyncServiceBrowser(self.__zeroconf.zeroconf, "_hue._tcp.local.",
+        self.__service_browser = azc.AsyncServiceBrowser(self.__zeroconf.zeroconf, '_hue._tcp.local.',
                                                          handlers=[self.__handle_service_event])
 
     async def stop(self):
