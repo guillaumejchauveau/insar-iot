@@ -1,4 +1,4 @@
-FROM gitlab.insa-rennes.fr:5050/guillaumejchauveau/iot/base
+FROM gitlab.insa-rennes.fr:5050/guillaumejchauveau/base-images/python-bluez:3.10-slim
 
 WORKDIR /usr/src/app
 
