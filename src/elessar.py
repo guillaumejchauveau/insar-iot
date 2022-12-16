@@ -4,24 +4,29 @@ from typing import Generator
 
 import quart
 
-import ble_beacons
+import ble
+import ble.vendors
 import hue
 
 
 class Elessar(quart.Quart):
-    __beacon_manager: ble_beacons.BeaconManager
+    __beacon_manager: ble.BeaconManager
     __hue_bridge_manager: hue.BridgeManager
     __save_filename: str
+    __lights_state: bool
+    __force_lights_state: bool
 
     def __init__(self, save_filename: str):
         super().__init__('Elessar')
 
-        self.__beacon_manager = ble_beacons.BeaconManager(self.__available_beacons_updated, [
-            ble_beacons.IBeacon,
-            ble_beacons.EddystoneBeacon
+        self.__beacon_manager = ble.BeaconManager(self.__available_beacons_updated, [
+            ble.vendors.iBeacon,
+            ble.vendors.Eddystone
         ])
         self.__hue_bridge_manager = hue.BridgeManager()
         self.__save_filename = save_filename
+        self.__lights_state = None
+        self.__force_lights_state = False
 
         self.load_save()
 
@@ -38,15 +43,23 @@ class Elessar(quart.Quart):
                     bridge.connect(self.__hue_bridge_manager.get_bridge_ip(bridge.id))
                     self.save()
                 yield bridge
-            except Exception as e:
+            except BaseException as e:
                 self.logger.warning(e)
 
     def __set_lights(self, value: bool):
+        if self.__lights_state is not None and not self.__force_lights_state:
+            if value == self.__lights_state:
+                return
+
+        success = True
         for bridge in self.__connected_bridges():
             try:
                 bridge.set_groups_on(value)
-            except Exception as e:
+            except BaseException as e:
+                success = False
                 self.logger.warning(e)
+
+        self.__lights_state = value if success else None
 
     def __available_beacons_updated(self):
         if len(self.__beacon_manager.beacons) == 0:
@@ -58,13 +71,18 @@ class Elessar(quart.Quart):
             file = open(self.__save_filename, 'r')
             data = json.load(file)
             file.close()
-        except Exception as e:
+        except BaseException as e:
             self.logger.warning(e)
             return
 
         try:
             self.__beacon_manager.scan_period = int(data['scan_period'])
-        except Exception as e:
+        except BaseException as e:
+            self.logger.warning(e)
+
+        try:
+            self.__force_lights_state = bool(data['force_lights_state'])
+        except BaseException as e:
             self.logger.warning(e)
 
         beacons = {}
@@ -72,7 +90,7 @@ class Elessar(quart.Quart):
             try:
                 beacon = self.__beacon_manager.from_state(beacon_state)
                 beacons[beacon.id] = beacon
-            except Exception as e:
+            except BaseException as e:
                 self.logger.warning(e)
         self.__beacon_manager.beacons = beacons
 
@@ -81,7 +99,7 @@ class Elessar(quart.Quart):
             try:
                 bridge = hue.Bridge.__setstate__(bridge_state)
                 bridges[bridge.id] = bridge
-            except Exception as e:
+            except BaseException as e:
                 self.logger.warning(e)
         self.__hue_bridge_manager.bridges = bridges
 
@@ -89,13 +107,14 @@ class Elessar(quart.Quart):
         try:
             data = {
                 'scan_period': self.__beacon_manager.scan_period,
+                'force_lights_state': self.__force_lights_state,
                 'beacons': [beacon.__getstate__() for beacon in self.__beacon_manager.beacons.values()],
                 'bridges': [bridge.__getstate__() for bridge in self.__hue_bridge_manager.bridges.values()]
             }
             file = open(self.__save_filename, 'w')
             json.dump(data, file, indent=4)
             file.close()
-        except Exception as e:
+        except BaseException as e:
             self.logger.warning(e)
 
     async def index(self):
@@ -105,6 +124,7 @@ class Elessar(quart.Quart):
 
         return await quart.render_template('index.html',
                                            scan_period=self.__beacon_manager.scan_period,
+                                           force_lights_state=self.__force_lights_state,
                                            available_beacons=self.__beacon_manager.available_beacons,
                                            beacons=self.__beacon_manager.beacons,
                                            available_bridges=self.__hue_bridge_manager.available_bridges,
@@ -130,6 +150,9 @@ class Elessar(quart.Quart):
 
     async def set_bridges(self):
         data = await quart.request.form
+
+        self.__force_lights_state = 'force_lights_state' in data
+
         bridge_ids = set(data.getlist('bridge[]'))
 
         for remove_bridge_id in set(self.__hue_bridge_manager.bridges.keys()).difference(bridge_ids):

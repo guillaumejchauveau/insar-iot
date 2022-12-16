@@ -36,6 +36,8 @@
 <form action="/bridges" method="post">
     <fieldset>
         <legend>Hue Bridges</legend>
+        <label for="force_lights_state">Force lights state: </label>
+        <input type="checkbox" id="force_lights_state" name="force_lights_state" {% if force_lights_state %}checked{% endif %}>
         <ul>
             {% for bridge in bridges.values() %}
                 {% set bridge_field = 'bridge[' ~ bridge.id ~ ']' %}
