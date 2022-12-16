@@ -1,0 +1,67 @@
+{% macro beacon(beacon, selected=false, available=false) %}
+    {% set indicator_class = 'bg-success' if available else 'bg-secondary' %}
+    <li class="list-group-item position-relative">
+        <input class="form-check-input me-1"
+               type="checkbox"
+               id="beacon[{{ beacon.id }}]"
+               name="beacon[]"
+               value="{{ beacon.id }}"
+               {% if selected %}checked{% endif %}>
+        <label class="form-check-label stretched-link"
+               for="beacon[{{ beacon.id }}]">{{ beacon.name }}</label>
+        <span class="p-1 rounded-circle position-absolute top-50 translate-middle-y {{ indicator_class }}"
+              style="right: 15px"></span>
+    </li>
+{% endmacro %}
+
+{% macro group(bridge, group_id, group_name) %}
+    <li class="list-group-item">
+        <input class="form-check-input me-1"
+               type="checkbox"
+               id="group[{{ bridge.id }}][{{ group_id }}]"
+               name="group[{{ bridge.id }}][]"
+               value="{{ group_id }}"
+               {% if group_id in bridge.group_ids %}checked{% endif %}>
+        <label class="form-check-label stretched-link"
+               for="group[{{ bridge.id }}][{{ group_id }}]">{{ group_name }}</label>
+    </li>
+{% endmacro %}
+
+{% macro bridge(bridge_id, bridge_name, selected=false, available=false, error=None) %}
+    {% if error %}
+        {% set indicator_class = 'text-bg-danger' %}
+        {% set indicator_text = error %}
+    {% elif not available %}
+        {% set indicator_class = 'text-bg-secondary' %}
+        {% set indicator_text = 'Unavailable' %}
+    {% elif selected %}
+        {% set indicator_class = 'text-bg-success' %}
+        {% set indicator_text = 'Connected' %}
+    {% else %}
+        {% set indicator_class = 'text-bg-primary' %}
+        {% set indicator_text = 'Available' %}
+    {% endif %}
+    <div class="col-md">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title position-relative">
+                    {{ bridge_name or "Unknown name" }}
+                    <span class="badge position-absolute end-0 {{ indicator_class }}">{{ indicator_text }}</span>
+                </h5>
+            </div>
+            {{ caller() }}
+            <div class="card-footer position-relative">
+                <div class="form-check form-switch">
+                    <input class="form-check-input"
+                           type="checkbox" role="switch"
+                           id="bridge[{{ bridge_id }}]"
+                           name="bridge[]"
+                           value="{{ bridge_id }}"
+                           {% if selected %}checked{% endif %}>
+                    <label class="form-check-label stretched-link"
+                           for="bridge[{{ bridge_id }}]">Use this bridge</label>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endmacro %}
