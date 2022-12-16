@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Generator
+from typing import Generator, Optional
 
 import quart
 
@@ -13,7 +13,7 @@ class Elessar(quart.Quart):
     __beacon_manager: ble.BeaconManager
     __hue_bridge_manager: hue.BridgeManager
     __save_filename: str
-    __lights_state: bool
+    __lights_state: Optional[bool]
     __force_lights_state: bool
 
     def __init__(self, save_filename: str):
@@ -31,8 +31,7 @@ class Elessar(quart.Quart):
         self.load_save()
 
         self.add_url_rule('/', 'index', self.index, methods=['GET'])
-        self.add_url_rule('/beacons', 'set_beacons', self.set_beacons, methods=['POST'])
-        self.add_url_rule('/bridges', 'set_bridges', self.set_bridges, methods=['POST'])
+        self.add_url_rule('/', 'configure', self.configure, methods=['POST'])
 
     def __connected_bridges(self) -> Generator[hue.Bridge, None, None]:
         for bridge in self.__hue_bridge_manager.bridges.values():
@@ -130,7 +129,7 @@ class Elessar(quart.Quart):
                                            available_bridges=self.__hue_bridge_manager.available_bridges,
                                            bridges=self.__hue_bridge_manager.bridges)
 
-    async def set_beacons(self):
+    async def configure(self):
         data = await quart.request.form
 
         self.__beacon_manager.scan_period = int(data['scan_period'])
@@ -143,13 +142,6 @@ class Elessar(quart.Quart):
         for add_beacon_id in beacons_ids.difference(self.__beacon_manager.beacons.keys()):
             self.__beacon_manager.beacons[add_beacon_id] = self.__beacon_manager.available_beacons.get(
                 add_beacon_id, self.__beacon_manager.from_id(add_beacon_id))
-
-        self.save()
-
-        return quart.redirect('/')
-
-    async def set_bridges(self):
-        data = await quart.request.form
 
         self.__force_lights_state = 'force_lights_state' in data
 

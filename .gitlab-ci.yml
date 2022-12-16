@@ -17,7 +17,7 @@ base:
   extends: .build_job
   stage: .pre
   rules:
-    - changes: [base/**/*]
+    - changes: [ base/**/* ]
   variables:
     CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE
     IMAGE_PLATFORM: "linux/amd64,linux/arm64"

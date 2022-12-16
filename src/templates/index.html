@@ -1,86 +1,94 @@
+{% import 'partials.html' as partials %}
 <!DOCTYPE html>
 
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Elessar</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65">
+    <style>
+        .list-group-item {
+            word-break: break-all;
+        }
+
+        .list-group-item .form-check-label {
+            display: inline;
+        }
+    </style>
 </head>
 <body>
-<form action="/beacons" method="post">
-    <fieldset>
-        <legend>Beacons</legend>
-        <label for="scan_period">Scan period: </label>
-        <input type="number" id="scan_period" name="scan_period" value="{{ scan_period }}">
-        <ul>
-            {% for beacon in beacons.values() %}
-                {% set beacon_field = 'beacon[' ~ beacon.id ~ ']' %}
-                <li>
-                    <input type="checkbox" id="{{ beacon_field }}" name="beacon[]" value="{{ beacon.id }}" checked>
-                    <label for="{{ beacon_field }}">{{ beacon.name }}</label>
-                </li>
-            {% endfor %}
-            {% for beacon in available_beacons.values() %}
-                {% if not beacon.id in beacons %}
-                    {% set beacon_field = 'beacon[' ~ beacon.id ~ ']' %}
-                    <li>
-                        <input type="checkbox" id="{{ beacon_field }}" name="beacon[]" value="{{ beacon.id }}">
-                        <label for="{{ beacon_field }}">{{ beacon.name }}</label>
-                    </li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-        <input type="submit" value="Submit">
-    </fieldset>
-</form>
+<form class="container" action="/" method="post">
+    <div class="row g-4 align-items-center my-3">
+        <div class="col-12 col-md-6 col-lg-4">
+            <label class="visually-hidden" for="scan_period">Scan period</label>
+            <div class="input-group">
+                <div class="input-group-text">Scan period</div>
+                <input type="number" min="1" name="scan_period" class="form-control" id="scan_period"
+                       value="{{ scan_period }}">
+                <span class="input-group-text">seconds</span>
+            </div>
+        </div>
 
-<form action="/bridges" method="post">
-    <fieldset>
-        <legend>Hue Bridges</legend>
-        <label for="force_lights_state">Force lights state: </label>
-        <input type="checkbox" id="force_lights_state" name="force_lights_state" {% if force_lights_state %}checked{% endif %}>
-        <ul>
-            {% for bridge in bridges.values() %}
-                {% set bridge_field = 'bridge[' ~ bridge.id ~ ']' %}
-                <li>
-                    <input type="checkbox" id="{{ bridge_field }}" name="bridge[]" value="{{ bridge.id }}" checked>
-                    <label for="{{ bridge_field }}">
-                        {{ bridge.name }}
-                        {% if bridge.connected %}
-                            connected
-                        {% elif bridge.id in available_bridges %}
-                            available, try to press the link button
-                        {% else %}
-                            disconnected
-                        {% endif %}
-                    </label>
-                    {% if bridge.connected %}
-                        <ul>
-                            {% for group_id, group_name in bridge.available_groups.items() %}
-                                {% set group_field = 'group[' ~ bridge.id ~ '][' ~ group_id ~ ']' %}
-                                <li>
-                                    <input type="checkbox" id="{{ group_field }}" name="group[{{ bridge.id }}][]"
-                                           value="{{ group_id }}"
-                                           {% if group_id in bridge.group_ids %}checked{% endif %}>
-                                    <label for="{{ group_field }}">{{ group_name }}</label>
-                                </li>
-                            {% endfor %}
-                        </ul>
+        <div class="col-8 col-md-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="force_lights_state"
+                       name="force_lights_state" {% if force_lights_state %}checked{% endif %}>
+                <label class="form-check-label" for="force_lights_state">Force lights state</label>
+            </div>
+        </div>
+
+        <div class="col-4 col-md-2 col-lg-4 text-end">
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+
+    <div class="row g-4 my-3">
+        <div class="col-md">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Beacons</h5>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% if not beacons and not available_beacons %}
+                        <li class="list-group-item text-muted">No beacons</li>
                     {% endif %}
-                </li>
-            {% endfor %}
+                    {% for beacon in beacons.values() %}
+                        {{ partials.beacon(beacon, true, beacon.id in available_beacons) }}
+                    {% endfor %}
+                    {% for beacon in available_beacons.values() %}
+                        {% if beacon.id not in beacons %}
+                            {{ partials.beacon(beacon, false, true) }}
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
 
-            {% for bridge_id, bridge_name in available_bridges.items() %}
-                {% if not bridge_id in bridges %}
-                    {% set bridge_field = 'bridge[' ~ bridge_id ~ ']' %}
-                    <li>
-                        <input type="checkbox" id="{{ bridge_field }}" name="bridge[]" value="{{ bridge_id }}">
-                        <label for="{{ bridge_field }}">{{ bridge_name }} available</label>
-                    </li>
+        {% for bridge in bridges.values() %}
+            {% set available = bridge.id in available_bridges %}
+            {% set error = 'Press link button' if not bridge.connected and available else None %}
+            {% call partials.bridge(bridge.id, bridge.name, true, available, error) %}
+                {% if bridge.connected %}
+                    <ul class="list-group list-group-flush">
+                        {% if not bridge.available_groups %}
+                            <li class="list-group-item text-muted">No groups</li>
+                        {% endif %}
+                        {% for group_id, group_name in bridge.available_groups.items() %}
+                            {{ partials.group(bridge, group_id, group_name) }}
+                        {% endfor %}
+                    </ul>
                 {% endif %}
-            {% endfor %}
-        </ul>
-        <input type="submit" value="Submit">
-    </fieldset>
+            {% endcall %}
+        {% endfor %}
+
+        {% for bridge_id, bridge_name in available_bridges.items() %}
+            {% if not bridge_id in bridges %}
+                {% call partials.bridge(bridge_id, bridge_name, false, true) %}{% endcall %}
+            {% endif %}
+        {% endfor %}
+    </div>
 </form>
 </body>
 </html>
