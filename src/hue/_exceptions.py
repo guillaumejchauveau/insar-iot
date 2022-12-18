@@ -2,9 +2,9 @@ class ClientError(RuntimeError):
     pass
 
 
-class BridgeError(BaseException):
+class BridgeError(Exception):
     error: dict[str, any]
-    exception: BaseException
+    exception: Exception
 
     def __init__(self, message: str, error: dict[str, any] = None, exception: Exception = None):
         super().__init__(message)

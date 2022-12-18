@@ -40,7 +40,7 @@ class iBeacon(Beacon):
             uuid, major, minor = _id.split(':', 3)
 
             return cls(UUID(uuid), int(major), int(minor))
-        except ValueError or TypeError:
+        except (ValueError, TypeError):
             raise InvalidBeaconIDError()
 
     __uuid: UUID
@@ -79,7 +79,7 @@ class iBeacon(Beacon):
     def __setstate__(cls, state):
         try:
             return cls(UUID(state['uuid']), int(state['major']), int(state['minor']))
-        except KeyError or ValueError or TypeError:
+        except (KeyError, ValueError, TypeError):
             raise InvalidBeaconStateError()
 
 
@@ -114,7 +114,7 @@ class Eddystone(Beacon):
             namespace, instance = _id.split(':', 2)
 
             return cls(namespace, instance)
-        except ValueError or TypeError:
+        except (ValueError, TypeError):
             raise InvalidBeaconIDError()
 
     __namespace: str
@@ -152,5 +152,5 @@ class Eddystone(Beacon):
     def __setstate__(cls, state):
         try:
             return cls(state['namespace'], state['instance'], state['name'])
-        except KeyError or ValueError or TypeError:
+        except (KeyError, ValueError, TypeError):
             raise InvalidBeaconStateError()

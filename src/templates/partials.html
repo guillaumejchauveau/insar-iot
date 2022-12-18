@@ -1,5 +1,4 @@
 {% macro beacon(beacon, selected=false, available=false) %}
-    {% set indicator_class = 'bg-success' if available else 'bg-secondary' %}
     <li class="list-group-item position-relative">
         <input class="form-check-input me-1"
                type="checkbox"
@@ -9,8 +8,10 @@
                {% if selected %}checked{% endif %}>
         <label class="form-check-label stretched-link"
                for="beacon[{{ beacon.id }}]">{{ beacon.name }}</label>
-        <span class="p-1 rounded-circle position-absolute top-50 translate-middle-y {{ indicator_class }}"
-              style="right: 15px"></span>
+        {% if available %}
+            <span class="p-1 rounded-circle position-absolute top-50 translate-middle-y bg-success"
+                  style="right: 15px"></span>
+        {% endif %}
     </li>
 {% endmacro %}
 

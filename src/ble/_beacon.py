@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import logging
 import types
 from typing import Optional, Type
 
@@ -65,6 +66,7 @@ class Beacon(abc.ABC):
 
 
 class BeaconManager:
+    __logger: logging.Logger
     __stop_event: asyncio.Event
     __scanner: bleak.BleakScanner
     __beacon_types: dict[str, Type[Beacon]]
@@ -75,6 +77,7 @@ class BeaconManager:
     beacons: dict[str, Beacon]
 
     def __init__(self, callback: callable, beacon_types: list[Type[Beacon]]):
+        self.__logger = logging.getLogger(__name__)
         self.__stop_event = asyncio.Event()
         self.__scanner = bleak.BleakScanner(self.__scan_callback)
         self.__beacon_types = {beacon_type.vendor(): beacon_type for beacon_type in beacon_types}
@@ -98,8 +101,10 @@ class BeaconManager:
 
                     if beacon.id in self.beacons:
                         self.beacons[beacon.id] = beacon
-            finally:
-                pass
+
+                    self.__logger.debug("Processed beacon '%s'", beacon.name)
+            except Exception as e:
+                self.__logger.warning(e if e.args else type(e))
 
         return added
 
